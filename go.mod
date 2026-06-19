@@ -1,6 +1,6 @@
 module github.com/benakaben10/sns
 
-go 1.23.0
+go 1.26
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.3.5
