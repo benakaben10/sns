@@ -1,0 +1,9 @@
+{
+    "_comment": "Service reads config from environment variables. This file describes the structure and default values.",
+    "HTTP_PORT": "8080",
+    "KAFKA_EMAIL_SEND_TOPIC": "email.send",
+    "KAFKA_EMAIL_RESULT_TOPIC": "email.result",
+    "KAFKA_CONSUMER_GROUP": "notification-service",
+    "CHANNEL_BUFFER_SIZE": "1000",
+    "JWT_AUTH_MODE": "symmetric"
+}

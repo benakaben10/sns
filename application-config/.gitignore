@@ -1,0 +1,3 @@
+# Runtime config — do not commit to git
+.env
+config.json

@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "8080:8080"
+      - "10254:10254"
+    environment:
+      HTTP_PORT: "8080"
+      POSTGRES_DSN: "postgres://notifsvc:notifpass@postgres:5432/notifdb?sslmode=disable"
+      KAFKA_BROKERS: "redpanda:9092"
+      KAFKA_EMAIL_SEND_TOPIC: "email.send"
+      KAFKA_EMAIL_RESULT_TOPIC: "email.result"
+      KAFKA_CONSUMER_GROUP: "notification-service"
+      CHANNEL_BUFFER_SIZE: "1000"
+      JWT_AUTH_MODE: "symmetric"
+      JWT_HMAC_SECRET: "local-dev-secret-change-in-production"
+      JWT_ISSUER: "notification-service-local"
+      JWT_AUDIENCE: "notification-service"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: notifdb
+      POSTGRES_USER: notifsvc
+      POSTGRES_PASSWORD: notifpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notifsvc -d notifdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redpanda:
+    image: redpandadata/redpanda:v23.3.11
+    command:
+      - redpanda
+      - start
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:18082
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:18082
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:18081
+      - --rpc-addr redpanda:33145
+      - --advertise-rpc-addr redpanda:33145
+      - --smp 1
+      - --memory 1G
+      - --mode dev-container
+      - --default-log-level=warn
+    ports:
+      - "19092:19092"
+      - "18082:18082"
+      - "18081:18081"
+      - "19644:9644"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  redpanda-console:
+    image: redpandadata/console:v2.4.5
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_BROKERS: "redpanda:9092"
+    depends_on:
+      - redpanda
+
+volumes:
+  postgres_data:
+  redpanda_data:

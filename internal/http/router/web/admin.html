@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SNS Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .modal-backdrop { backdrop-filter: blur(2px); }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .toast-enter { animation: slideIn .25s ease-out; }
+    @keyframes slideIn { from { opacity:0; transform:translateY(1rem); } to { opacity:1; transform:translateY(0); } }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen font-sans text-slate-800">
+
+<!-- ── LOGIN SCREEN ────────────────────────────────────────────────────── -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 mb-4">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold text-slate-900">SNS Admin</h1>
+      <p class="text-slate-500 text-sm mt-1">Simple Notification Service</p>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">JWT Token</label>
+        <textarea id="jwt-input" rows="5"
+          class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent
+                 placeholder:text-slate-400 resize-none"
+          placeholder="Dán JWT token vào đây...&#10;&#10;Ctrl+Enter để đăng nhập"></textarea>
+      </div>
+      <div id="login-error"
+        class="hidden bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3"></div>
+      <button onclick="doLogin()"
+        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4
+               rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        Đăng nhập
+      </button>
+    </div>
+    <p class="text-center text-xs text-slate-400 mt-6">Token được lưu tại localStorage</p>
+  </div>
+</div>
+
+<!-- ── MAIN SCREEN ─────────────────────────────────────────────────────── -->
+<div id="main-screen" class="hidden min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <span class="font-bold text-slate-900">SNS Admin</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:flex items-center gap-2 text-sm text-slate-600 bg-slate-100 rounded-lg px-3 py-1.5">
+          <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+          <span id="user-display" class="max-w-[180px] truncate"></span>
+        </div>
+        <button onclick="doLogout()"
+          class="flex items-center gap-1.5 text-sm text-slate-600 hover:text-red-600
+                 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+          </svg>
+          Đăng xuất
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 -mb-px">
+      <button id="tab-smtp" onclick="switchTab('smtp')"
+        class="tab-btn flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2
+               border-indigo-600 text-indigo-600 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066
+               c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35
+               a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065
+               c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37
+               a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573
+               c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        SMTP Configs
+      </button>
+      <button id="tab-send" onclick="switchTab('send')"
+        class="tab-btn flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2
+               border-transparent text-slate-500 hover:text-slate-700 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+        </svg>
+        Gửi Email Test
+      </button>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- ── TAB: SMTP CONFIGS ─────────────────────────────────────────── -->
+    <div id="panel-smtp" class="tab-panel active">
+
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">SMTP Configurations</h2>
+          <p class="text-slate-500 text-sm mt-0.5">Quản lý cấu hình máy chủ gửi email</p>
+        </div>
+        <button onclick="openCreateModal()"
+          class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white
+                 font-medium px-4 py-2 rounded-lg transition-colors text-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          Thêm cấu hình
+        </button>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div id="table-loading" class="hidden flex-col items-center justify-center py-16 gap-3">
+          <svg class="spinner w-8 h-8 text-indigo-600" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+          <span class="text-slate-500 text-sm">Đang tải...</span>
+        </div>
+        <div id="table-empty" class="hidden flex-col items-center justify-center py-16 gap-3">
+          <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+            <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5
+                   m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172
+                   a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+            </svg>
+          </div>
+          <p class="text-slate-600 font-medium">Chưa có cấu hình SMTP nào</p>
+          <p class="text-slate-400 text-sm">Nhấn "Thêm cấu hình" để bắt đầu</p>
+        </div>
+        <div id="table-wrapper" class="hidden overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Tên</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">From Email</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Host / Port</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Mã hoá</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                <th class="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="configs-body" class="divide-y divide-slate-100 bg-white"></tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /panel-smtp -->
+
+    <!-- ── TAB: SEND TEST EMAIL ──────────────────────────────────────── -->
+    <div id="panel-send" class="tab-panel">
+      <div class="mb-6">
+        <h2 class="text-xl font-bold text-slate-900">Gửi Email Test</h2>
+        <p class="text-slate-500 text-sm mt-0.5">
+          Email sẽ được đưa vào queue → Kafka → Worker → SMTP. Kết quả trả về ngay là <code class="bg-slate-100 px-1 rounded text-xs">request_id</code>.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        <!-- Form -->
+        <div class="lg:col-span-3">
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <form id="send-form" onsubmit="submitSendForm(event)" class="space-y-4">
+
+              <!-- From -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                  From <span class="text-red-500">*</span>
+                </label>
+                <input type="email" id="s-from"
+                  class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="sender@example.com" />
+                <p id="se-from" class="hidden text-red-500 text-xs mt-1"></p>
+              </div>
+
+              <!-- To -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                  To <span class="text-red-500">*</span>
+                </label>
+                <!-- Tag input area -->
+                <div id="to-tags-container"
+                  class="min-h-[42px] w-full px-2 py-1.5 border border-slate-300 rounded-lg
+                         flex flex-wrap gap-1.5 items-center cursor-text"
+                  onclick="document.getElementById('to-input').focus()">
+                  <div id="to-tags" class="contents"></div>
+                  <input type="email" id="to-input"
+                    class="flex-1 min-w-[180px] px-1 py-0.5 text-sm outline-none bg-transparent"
+                    placeholder="email@example.com rồi nhấn Enter hoặc dấu phẩy"
+                    oninput="onToInput(event)"
+                    onkeydown="onToKeydown(event)"
+                    onblur="commitToInput()" />
+                </div>
+                <p class="text-slate-400 text-xs mt-1">Nhấn Enter hoặc dấu phẩy để thêm nhiều địa chỉ</p>
+                <p id="se-to" class="hidden text-red-500 text-xs mt-1"></p>
+              </div>
+
+              <!-- Subject -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                  Tiêu đề <span class="text-red-500">*</span>
+                </label>
+                <input type="text" id="s-title"
+                  class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Tiêu đề email" />
+                <p id="se-title" class="hidden text-red-500 text-xs mt-1"></p>
+              </div>
+
+              <!-- Body -->
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                  Nội dung <span class="text-red-500">*</span>
+                </label>
+                <textarea id="s-body" rows="6"
+                  class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm
+                         focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+                  placeholder="Nội dung email..."></textarea>
+                <p id="se-body" class="hidden text-red-500 text-xs mt-1"></p>
+              </div>
+
+              <!-- Send error -->
+              <div id="send-error"
+                class="hidden bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3"></div>
+
+              <!-- Buttons -->
+              <div class="flex gap-3 pt-1">
+                <button type="submit" id="send-btn"
+                  class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white
+                         font-medium px-5 py-2 rounded-lg transition-colors text-sm
+                         disabled:opacity-50 disabled:cursor-not-allowed">
+                  <svg id="send-spinner" class="hidden spinner w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  <svg id="send-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                  </svg>
+                  Gửi email
+                </button>
+                <button type="button" onclick="resetSendForm()"
+                  class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300
+                         rounded-lg hover:bg-slate-50 transition-colors">
+                  Xóa form
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+
+        <!-- Result + History -->
+        <div class="lg:col-span-2 space-y-4">
+
+          <!-- Last result -->
+          <div id="send-result-box" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div class="flex items-center gap-2 mb-3">
+              <div id="result-icon-ok"
+                class="hidden w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+              </div>
+              <div id="result-icon-err"
+                class="hidden w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </div>
+              <h3 id="result-title" class="font-semibold text-slate-900 text-sm"></h3>
+            </div>
+            <dl class="space-y-2 text-sm">
+              <div class="flex gap-2">
+                <dt class="text-slate-500 shrink-0 w-24">Request ID</dt>
+                <dd id="result-rid" class="font-mono text-slate-900 text-xs break-all"></dd>
+              </div>
+              <div class="flex gap-2">
+                <dt class="text-slate-500 shrink-0 w-24">Trạng thái</dt>
+                <dd id="result-status" class="font-medium"></dd>
+              </div>
+              <div class="flex gap-2">
+                <dt class="text-slate-500 shrink-0 w-24">Thời gian</dt>
+                <dd id="result-time" class="text-slate-700"></dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- Send history -->
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-slate-700">Lịch sử gửi (phiên này)</h3>
+              <button onclick="clearHistory()"
+                class="text-xs text-slate-400 hover:text-red-500 transition-colors">Xóa</button>
+            </div>
+            <div id="history-empty" class="py-8 text-center text-slate-400 text-sm">
+              Chưa có email nào được gửi
+            </div>
+            <ul id="history-list" class="hidden divide-y divide-slate-100 max-h-80 overflow-y-auto"></ul>
+          </div>
+
+        </div>
+      </div>
+    </div><!-- /panel-send -->
+
+  </main>
+</div><!-- /main-screen -->
+
+<!-- ── CREATE / EDIT MODAL ─────────────────────────────────────────────── -->
+<div id="config-modal" class="hidden fixed inset-0 z-50 modal-backdrop bg-slate-900/50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+      <h3 id="modal-title" class="text-lg font-semibold text-slate-900"></h3>
+      <button onclick="closeModal()"
+        class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <form id="config-form" onsubmit="submitConfigForm(event)" class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Tên cấu hình <span class="text-red-500">*</span></label>
+        <input type="text" id="f-name"
+          class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="VD: Gmail Production" />
+        <p id="e-name" class="hidden text-red-500 text-xs mt-1"></p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">From Email</label>
+        <input type="email" id="f-from_email"
+          class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="sender@example.com" />
+        <p class="text-slate-400 text-xs mt-1">Để trống để dùng làm config mặc định cho mọi địa chỉ</p>
+        <p id="e-from_email" class="hidden text-red-500 text-xs mt-1"></p>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="col-span-2">
+          <label class="block text-sm font-medium text-slate-700 mb-1">SMTP Host <span class="text-red-500">*</span></label>
+          <input type="text" id="f-host"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="smtp.gmail.com" />
+          <p id="e-host" class="hidden text-red-500 text-xs mt-1"></p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Port <span class="text-red-500">*</span></label>
+          <input type="number" id="f-port" min="1" max="65535"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="587" />
+          <p id="e-port" class="hidden text-red-500 text-xs mt-1"></p>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Username <span class="text-red-500">*</span></label>
+        <input type="text" id="f-username" autocomplete="username"
+          class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="user@example.com" />
+        <p id="e-username" class="hidden text-red-500 text-xs mt-1"></p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Password <span id="pw-required" class="text-red-500">*</span>
+        </label>
+        <div class="relative">
+          <input type="password" id="f-password" autocomplete="new-password"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button type="button" onclick="togglePwVisibility()"
+            class="absolute inset-y-0 right-0 px-3 text-slate-400 hover:text-slate-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+          </button>
+        </div>
+        <p id="pw-hint" class="text-slate-400 text-xs mt-1"></p>
+        <p id="e-password" class="hidden text-red-500 text-xs mt-1"></p>
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-slate-700">Mã hoá kết nối</label>
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <input type="checkbox" id="f-use_tls" onchange="onTLSChange(this)"
+            class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+          <div>
+            <span class="text-sm text-slate-700 group-hover:text-slate-900">TLS (SSL)</span>
+            <p class="text-xs text-slate-400">Kết nối SSL/TLS ngay từ đầu — thường dùng port 465</p>
+          </div>
+        </label>
+        <label class="flex items-start gap-3 cursor-pointer group">
+          <input type="checkbox" id="f-use_starttls" onchange="onSTARTTLSChange(this)"
+            class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+          <div>
+            <span class="text-sm text-slate-700 group-hover:text-slate-900">STARTTLS</span>
+            <p class="text-xs text-slate-400">Nâng cấp kết nối lên TLS — thường dùng port 587 (Gmail)</p>
+          </div>
+        </label>
+        <div id="tls-conflict"
+          class="hidden bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg px-3 py-2">
+          Không thể bật đồng thời TLS và STARTTLS.
+        </div>
+      </div>
+      <label class="flex items-center gap-3 cursor-pointer p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+        <input type="checkbox" id="f-is_default"
+          class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+        <div>
+          <span class="text-sm font-medium text-slate-700">Đặt làm config mặc định</span>
+          <p class="text-xs text-slate-400 mt-0.5">Dùng khi không tìm thấy config theo from_email</p>
+        </div>
+      </label>
+      <div id="form-error"
+        class="hidden bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3"></div>
+    </form>
+    <div class="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+      <button type="button" onclick="closeModal()"
+        class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+        Huỷ
+      </button>
+      <button type="submit" form="config-form" id="submit-btn"
+        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white
+               bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        <svg id="submit-spinner" class="hidden spinner w-4 h-4" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        <span id="submit-label">Lưu</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── DELETE CONFIRM MODAL ────────────────────────────────────────────── -->
+<div id="delete-modal" class="hidden fixed inset-0 z-50 modal-backdrop bg-slate-900/50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="text-base font-semibold text-slate-900">Xác nhận xóa</h3>
+        <p class="text-sm text-slate-500 mt-0.5">Hành động này không thể hoàn tác.</p>
+      </div>
+    </div>
+    <p class="text-sm text-slate-700 mb-6">
+      Bạn có chắc muốn xóa cấu hình <strong id="delete-name" class="text-slate-900"></strong>?
+    </p>
+    <div class="flex gap-3 justify-end">
+      <button onclick="closeDeleteModal()"
+        class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+        Huỷ
+      </button>
+      <button onclick="confirmDelete()"
+        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+        <svg id="delete-spinner" class="hidden spinner w-4 h-4" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+        Xóa
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ───────────────────────────────────────────────────────────── -->
+<div id="toast-container" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+const API_BASE  = '/api';
+const TOKEN_KEY = 'sns_admin_token';
+
+let currentToken = null;
+let editingId    = null;
+let deletingId   = null;
+let isEditMode   = false;
+let activeTab    = 'smtp';
+let toEmails     = [];
+let sendHistory  = [];
+
+// ── Init ────────────────────────────────────────────────────────────────────
+(function init() {
+  const saved = localStorage.getItem(TOKEN_KEY);
+  if (saved) {
+    const claims = decodeJWT(saved);
+    if (claims && !isExpired(claims)) {
+      currentToken = saved;
+      showMainScreen(claims);
+      loadConfigs();
+      return;
+    }
+    localStorage.removeItem(TOKEN_KEY);
+  }
+  showLoginScreen();
+})();
+
+// ── JWT ──────────────────────────────────────────────────────────────────────
+function decodeJWT(token) {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b64));
+  } catch { return null; }
+}
+function isExpired(c) { return c.exp && Math.floor(Date.now() / 1000) > c.exp; }
+function userLabel(c) { return c.preferred_username || c.email || c.sub || 'Admin'; }
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+function doLogin() {
+  const token = document.getElementById('jwt-input').value.trim();
+  document.getElementById('login-error').classList.add('hidden');
+  if (!token) return showLoginErr('Vui lòng nhập JWT token.');
+  const claims = decodeJWT(token);
+  if (!claims) return showLoginErr('Token không đúng định dạng JWT.');
+  if (isExpired(claims)) return showLoginErr('Token đã hết hạn. Vui lòng tạo token mới.');
+  currentToken = token;
+  localStorage.setItem(TOKEN_KEY, token);
+  showMainScreen(claims);
+  loadConfigs();
+}
+function doLogout() {
+  currentToken = null;
+  localStorage.removeItem(TOKEN_KEY);
+  showLoginScreen();
+}
+function showLoginErr(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('main-screen').classList.add('hidden');
+  document.getElementById('jwt-input').value = '';
+}
+function showMainScreen(claims) {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('main-screen').classList.remove('hidden');
+  document.getElementById('user-display').textContent = userLabel(claims);
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  ['smtp','send'].forEach(t => {
+    const btn   = document.getElementById('tab-' + t);
+    const panel = document.getElementById('panel-' + t);
+    const active = t === tab;
+    panel.classList.toggle('active', active);
+    btn.classList.toggle('border-indigo-600', active);
+    btn.classList.toggle('text-indigo-600', active);
+    btn.classList.toggle('border-transparent', !active);
+    btn.classList.toggle('text-slate-500', !active);
+  });
+}
+
+// ── API Client ────────────────────────────────────────────────────────────────
+async function apiCall(method, path, body) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+  };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  let resp;
+  try { resp = await fetch(API_BASE + path, opts); }
+  catch { throw new Error('Không thể kết nối tới server.'); }
+  if (resp.status === 401) { doLogout(); throw new Error('Phiên đăng nhập hết hạn.'); }
+  if (resp.status === 403) throw new Error('Không đủ quyền (cần role admin hoặc scope tương ứng).');
+  if (resp.status === 404) throw new Error('Không tìm thấy.');
+  if (resp.status === 503) throw new Error('Server bận, vui lòng thử lại sau.');
+  if (resp.status === 204) return null;
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error(data?.error?.message || `Lỗi HTTP ${resp.status}`);
+  return data;
+}
+
+// ── SMTP Configs ──────────────────────────────────────────────────────────────
+async function loadConfigs() {
+  setTableState('loading');
+  try {
+    const list = await apiCall('GET', '/smtp-configs') || [];
+    list.length === 0 ? setTableState('empty') : (setTableState('data'), renderTable(list));
+  } catch (e) { setTableState('empty'); showToast(e.message, 'error'); }
+}
+
+function setTableState(s) {
+  document.getElementById('table-loading').classList.toggle('hidden', s !== 'loading');
+  document.getElementById('table-loading').classList.toggle('flex',   s === 'loading');
+  document.getElementById('table-empty').classList.toggle('hidden',   s !== 'empty');
+  document.getElementById('table-empty').classList.toggle('flex',     s === 'empty');
+  document.getElementById('table-wrapper').classList.toggle('hidden', s !== 'data');
+}
+
+function encLabel({tls, starttls}) {
+  if (tls)      return badge('TLS', 'bg-blue-100 text-blue-800');
+  if (starttls) return badge('STARTTLS', 'bg-indigo-100 text-indigo-800');
+  return badge('Không mã hoá', 'bg-slate-100 text-slate-600');
+}
+function badge(t, cls) {
+  return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}">${t}</span>`;
+}
+function checkBadge() {
+  return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+    </svg>Mặc định</span>`;
+}
+
+function renderTable(list) {
+  document.getElementById('configs-body').innerHTML = list.map(c => `
+    <tr class="hover:bg-slate-50 transition-colors">
+      <td class="px-4 py-3 text-sm text-slate-500 font-mono">${c.id}</td>
+      <td class="px-4 py-3">
+        <div class="text-sm font-medium text-slate-900">${escHtml(c.name)}</div>
+        <div class="text-xs text-slate-400">${escHtml(c.username)}</div>
+      </td>
+      <td class="px-4 py-3 text-sm text-slate-600">
+        ${c.from_email ? escHtml(c.from_email) : '<span class="text-slate-400 italic">mặc định</span>'}
+      </td>
+      <td class="px-4 py-3">
+        <div class="text-sm text-slate-900 font-mono">${escHtml(c.host)}</div>
+        <div class="text-xs text-slate-400">port ${c.port}</div>
+      </td>
+      <td class="px-4 py-3">${encLabel({tls:c.use_tls, starttls:c.use_starttls})}</td>
+      <td class="px-4 py-3">
+        ${c.is_default
+          ? checkBadge()
+          : `<button onclick="doSetDefault(${c.id})" class="text-xs text-slate-400 hover:text-indigo-600 hover:underline">Đặt mặc định</button>`}
+      </td>
+      <td class="px-4 py-3 text-right">
+        <div class="flex items-center justify-end gap-1">
+          <button onclick="prefillSendFrom('${escAttr(c.from_email || c.username)}')"
+            class="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+            title="Dùng để gửi test">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+            </svg>
+          </button>
+          <button onclick="openEditModal(${c.id})"
+            class="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+            title="Chỉnh sửa">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+          </button>
+          <button onclick="openDeleteModal(${c.id},'${escAttr(c.name)}')"
+            class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+            title="Xóa">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+// ── SMTP Config Modal ─────────────────────────────────────────────────────────
+function openCreateModal() {
+  isEditMode = false; editingId = null;
+  document.getElementById('modal-title').textContent  = 'Thêm cấu hình SMTP';
+  document.getElementById('submit-label').textContent = 'Tạo mới';
+  document.getElementById('pw-required').classList.remove('hidden');
+  document.getElementById('pw-hint').textContent    = '';
+  document.getElementById('f-password').placeholder = 'Nhập mật khẩu SMTP';
+  resetConfigForm();
+  document.getElementById('config-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('f-name').focus(), 50);
+}
+async function openEditModal(id) {
+  isEditMode = true; editingId = id;
+  document.getElementById('modal-title').textContent  = 'Chỉnh sửa cấu hình SMTP';
+  document.getElementById('submit-label').textContent = 'Lưu thay đổi';
+  document.getElementById('pw-required').classList.add('hidden');
+  document.getElementById('pw-hint').textContent    = 'Để trống để giữ nguyên mật khẩu';
+  document.getElementById('f-password').placeholder = '(Không đổi)';
+  resetConfigForm();
+  document.getElementById('config-modal').classList.remove('hidden');
+  try {
+    const c = await apiCall('GET', `/smtp-configs/${id}`);
+    document.getElementById('f-name').value           = c.name || '';
+    document.getElementById('f-from_email').value     = c.from_email || '';
+    document.getElementById('f-host').value           = c.host || '';
+    document.getElementById('f-port').value           = c.port || '';
+    document.getElementById('f-username').value       = c.username || '';
+    document.getElementById('f-use_tls').checked      = !!c.use_tls;
+    document.getElementById('f-use_starttls').checked = !!c.use_starttls;
+    document.getElementById('f-is_default').checked   = !!c.is_default;
+  } catch (e) { closeModal(); showToast(e.message, 'error'); }
+}
+function closeModal() {
+  document.getElementById('config-modal').classList.add('hidden');
+  resetConfigForm();
+}
+function resetConfigForm() {
+  ['f-name','f-from_email','f-host','f-port','f-username','f-password'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = '';
+    el.classList.remove('border-red-400');
+  });
+  document.getElementById('f-use_tls').checked      = false;
+  document.getElementById('f-use_starttls').checked = false;
+  document.getElementById('f-is_default').checked   = false;
+  document.getElementById('tls-conflict').classList.add('hidden');
+  ['e-name','e-from_email','e-host','e-port','e-username','e-password','form-error'].forEach(id =>
+    document.getElementById(id).classList.add('hidden'));
+  setConfigSubmitting(false);
+}
+async function submitConfigForm(e) {
+  e.preventDefault();
+  ['e-name','e-from_email','e-host','e-port','e-username','e-password','form-error'].forEach(id =>
+    document.getElementById(id).classList.add('hidden'));
+  const p = {
+    name:         document.getElementById('f-name').value.trim(),
+    from_email:   document.getElementById('f-from_email').value.trim(),
+    host:         document.getElementById('f-host').value.trim(),
+    port:         parseInt(document.getElementById('f-port').value, 10) || 0,
+    username:     document.getElementById('f-username').value.trim(),
+    password:     document.getElementById('f-password').value,
+    use_tls:      document.getElementById('f-use_tls').checked,
+    use_starttls: document.getElementById('f-use_starttls').checked,
+    is_default:   document.getElementById('f-is_default').checked,
+  };
+  let ok = true;
+  const fieldErr = (id, msg) => {
+    const el = document.getElementById(id); el.textContent = msg; el.classList.remove('hidden');
+    const inp = document.getElementById(id.replace('e-','f-'));
+    if (inp) inp.classList.add('border-red-400');
+    ok = false;
+  };
+  if (!p.name)     fieldErr('e-name',     'Tên không được để trống.');
+  if (!p.host)     fieldErr('e-host',     'Host không được để trống.');
+  if (!p.port || p.port < 1 || p.port > 65535) fieldErr('e-port', 'Port phải từ 1–65535.');
+  if (!p.username) fieldErr('e-username', 'Username không được để trống.');
+  if (!isEditMode && !p.password) fieldErr('e-password', 'Password bắt buộc khi tạo mới.');
+  if (p.use_tls && p.use_starttls) { document.getElementById('tls-conflict').classList.remove('hidden'); ok = false; }
+  if (!ok) return;
+  setConfigSubmitting(true);
+  try {
+    if (isEditMode) { await apiCall('PUT', `/smtp-configs/${editingId}`, p); showToast('Cập nhật thành công', 'success'); }
+    else            { await apiCall('POST', '/smtp-configs', p);            showToast('Tạo thành công', 'success'); }
+    closeModal(); loadConfigs();
+  } catch (e) {
+    const el = document.getElementById('form-error'); el.textContent = e.message; el.classList.remove('hidden');
+  } finally { setConfigSubmitting(false); }
+}
+function setConfigSubmitting(v) {
+  document.getElementById('submit-btn').disabled = v;
+  document.getElementById('submit-spinner').classList.toggle('hidden', !v);
+}
+function onTLSChange(el) { if (el.checked) document.getElementById('f-use_starttls').checked = false; document.getElementById('tls-conflict').classList.add('hidden'); }
+function onSTARTTLSChange(el) { if (el.checked) document.getElementById('f-use_tls').checked = false; document.getElementById('tls-conflict').classList.add('hidden'); }
+function togglePwVisibility() { const i = document.getElementById('f-password'); i.type = i.type === 'password' ? 'text' : 'password'; }
+
+// ── Delete Modal ──────────────────────────────────────────────────────────────
+function openDeleteModal(id, name) {
+  deletingId = id;
+  document.getElementById('delete-name').textContent = name;
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+function closeDeleteModal() {
+  deletingId = null;
+  document.getElementById('delete-modal').classList.add('hidden');
+  document.getElementById('delete-spinner').classList.add('hidden');
+}
+async function confirmDelete() {
+  if (!deletingId) return;
+  document.getElementById('delete-spinner').classList.remove('hidden');
+  try { await apiCall('DELETE', `/smtp-configs/${deletingId}`); showToast('Đã xóa', 'success'); closeDeleteModal(); loadConfigs(); }
+  catch (e) { showToast(e.message, 'error'); closeDeleteModal(); }
+}
+
+// ── Set Default ───────────────────────────────────────────────────────────────
+async function doSetDefault(id) {
+  try { await apiCall('PATCH', `/smtp-configs/${id}/default`); showToast('Đã đặt làm mặc định', 'success'); loadConfigs(); }
+  catch (e) { showToast(e.message, 'error'); }
+}
+
+// ── Prefill send tab from SMTP config row ─────────────────────────────────────
+function prefillSendFrom(email) {
+  switchTab('send');
+  document.getElementById('s-from').value = email;
+  document.getElementById('s-from').focus();
+}
+
+// ── Send Test Email ───────────────────────────────────────────────────────────
+// --- To tag input ---
+function onToInput(e) {
+  if (e.data === ',' || e.data === ';') {
+    e.target.value = e.target.value.replace(/[,;]/g, '');
+    commitToInput();
+  }
+}
+function onToKeydown(e) {
+  if (e.key === 'Enter') { e.preventDefault(); commitToInput(); }
+  if (e.key === 'Backspace' && !e.target.value && toEmails.length > 0) {
+    toEmails.pop(); renderToTags();
+  }
+}
+function commitToInput() {
+  const input = document.getElementById('to-input');
+  const val = input.value.trim().replace(/[,;]/g,'');
+  if (!val) return;
+  if (!isValidEmail(val)) { showToast('Email không hợp lệ: ' + val, 'error'); return; }
+  if (!toEmails.includes(val)) { toEmails.push(val); renderToTags(); }
+  input.value = '';
+}
+function removeToEmail(i) { toEmails.splice(i, 1); renderToTags(); }
+function renderToTags() {
+  const container = document.getElementById('to-tags');
+  container.innerHTML = toEmails.map((e, i) => `
+    <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md text-xs font-medium">
+      ${escHtml(e)}
+      <button type="button" onclick="removeToEmail(${i})"
+        class="text-indigo-400 hover:text-indigo-700 ml-0.5 leading-none">&times;</button>
+    </span>`).join('');
+}
+
+// --- Submit ---
+async function submitSendForm(e) {
+  e.preventDefault();
+  ['se-from','se-to','se-title','se-body','send-error'].forEach(id =>
+    document.getElementById(id).classList.add('hidden'));
+
+  commitToInput();
+
+  const from  = document.getElementById('s-from').value.trim();
+  const title = document.getElementById('s-title').value.trim();
+  const body  = document.getElementById('s-body').value.trim();
+
+  let ok = true;
+  const fe = (id, msg) => {
+    const el = document.getElementById(id); el.textContent = msg; el.classList.remove('hidden');
+    ok = false;
+  };
+  if (!from || !isValidEmail(from)) fe('se-from', 'From phải là email hợp lệ.');
+  if (toEmails.length === 0)        fe('se-to',   'Cần ít nhất 1 địa chỉ nhận.');
+  if (!title)                       fe('se-title', 'Tiêu đề không được để trống.');
+  if (!body)                        fe('se-body',  'Nội dung không được để trống.');
+  if (!ok) return;
+
+  setSendSubmitting(true);
+  try {
+    const res = await apiCall('POST', '/email/raw/send', {
+      from, to: toEmails, title, body,
+    });
+    showSendResult(true, res);
+    addHistory({ from, to: toEmails, title, requestId: res.request_id, status: res.status });
+    showToast('Email đã được đưa vào queue!', 'success');
+  } catch (err) {
+    showSendResult(false, null, err.message);
+    const el = document.getElementById('send-error');
+    el.textContent = err.message; el.classList.remove('hidden');
+  } finally {
+    setSendSubmitting(false);
+  }
+}
+function setSendSubmitting(v) {
+  document.getElementById('send-btn').disabled = v;
+  document.getElementById('send-spinner').classList.toggle('hidden', !v);
+  document.getElementById('send-icon').classList.toggle('hidden', v);
+}
+function resetSendForm() {
+  document.getElementById('send-form').reset();
+  toEmails = []; renderToTags();
+  ['se-from','se-to','se-title','se-body','send-error'].forEach(id =>
+    document.getElementById(id).classList.add('hidden'));
+  document.getElementById('send-result-box').classList.add('hidden');
+}
+
+// --- Result display ---
+function showSendResult(success, data, errMsg) {
+  const box = document.getElementById('send-result-box');
+  box.classList.remove('hidden');
+  document.getElementById('result-icon-ok').classList.toggle('hidden', !success);
+  document.getElementById('result-icon-err').classList.toggle('hidden', success);
+  document.getElementById('result-title').textContent = success ? 'Đã gửi vào queue thành công' : 'Gửi thất bại';
+  document.getElementById('result-rid').textContent    = data?.request_id || '—';
+  const statusEl = document.getElementById('result-status');
+  if (success) {
+    statusEl.innerHTML = badge(data?.status || 'queued', 'bg-emerald-100 text-emerald-800');
+  } else {
+    statusEl.innerHTML = badge('error', 'bg-red-100 text-red-800');
+  }
+  document.getElementById('result-time').textContent = new Date().toLocaleTimeString('vi-VN');
+}
+
+// --- History ---
+function addHistory(item) {
+  sendHistory.unshift({ ...item, time: new Date() });
+  if (sendHistory.length > 20) sendHistory.pop();
+  renderHistory();
+}
+function clearHistory() { sendHistory = []; renderHistory(); }
+function renderHistory() {
+  const list  = document.getElementById('history-list');
+  const empty = document.getElementById('history-empty');
+  if (sendHistory.length === 0) {
+    list.classList.add('hidden'); empty.classList.remove('hidden'); return;
+  }
+  list.classList.remove('hidden'); empty.classList.add('hidden');
+  list.innerHTML = sendHistory.map(h => `
+    <li class="px-4 py-3">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-medium text-slate-900 truncate">${escHtml(h.title)}</p>
+          <p class="text-xs text-slate-500 mt-0.5">
+            <span class="text-slate-400">From:</span> ${escHtml(h.from)}
+            → <span class="text-slate-400">To:</span> ${escHtml(h.to.join(', '))}
+          </p>
+          <p class="text-xs font-mono text-slate-400 mt-0.5 truncate">${escHtml(h.requestId)}</p>
+        </div>
+        <div class="shrink-0 text-right">
+          ${badge(h.status || 'queued', 'bg-emerald-100 text-emerald-800')}
+          <p class="text-xs text-slate-400 mt-1">${h.time.toLocaleTimeString('vi-VN')}</p>
+        </div>
+      </div>
+    </li>`).join('');
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function isValidEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); }
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) { return String(s ?? '').replace(/'/g, "\\'"); }
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(message, type = 'info') {
+  const cls  = {success:'bg-emerald-600', error:'bg-red-600', info:'bg-indigo-600'};
+  const icon = {
+    success: 'M5 13l4 4L19 7',
+    error:   'M6 18L18 6M6 6l12 12',
+    info:    'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  };
+  const el = document.createElement('div');
+  el.className = `toast-enter pointer-events-auto flex items-center gap-3 px-4 py-3
+    rounded-xl shadow-lg text-white text-sm font-medium max-w-sm ${cls[type]||cls.info}`;
+  el.innerHTML = `<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${icon[type]||icon.info}"/>
+  </svg><span>${escHtml(message)}</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => { el.style.transition='opacity .3s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, 3500);
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+document.getElementById('config-modal').addEventListener('click', e => { if (e.target===e.currentTarget) closeModal(); });
+document.getElementById('delete-modal').addEventListener('click', e => { if (e.target===e.currentTarget) closeDeleteModal(); });
+document.getElementById('jwt-input').addEventListener('keydown', e => { if (e.key==='Enter'&&(e.ctrlKey||e.metaKey)) doLogin(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDeleteModal(); } });
+</script>
+</body>
+</html>
